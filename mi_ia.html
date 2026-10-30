@@ -710,7 +710,6 @@ if (!respuesta?.ok) {
   }
 }
 }
-document.getElementById("zona").addEventListener("submit", e => {
 
 const botonMicrofono = document.getElementById("microfono");
 
@@ -743,23 +742,21 @@ if (ReconocimientoVoz) {
     estado.textContent = "Voz reconocida. Pulsa Enviar.";
   };
 
-  
-reconocimiento.onerror = (evento) => {
-  estado.textContent = "Error de voz: " + evento.error;
-  console.log("Error de reconocimiento:", evento.error);
-};
-
+  reconocimiento.onerror = (evento) => {
+    estado.textContent = "Error de voz: " + evento.error;
+    console.log("Error de reconocimiento:", evento.error);
+  };
 
   reconocimiento.onend = () => {
     botonMicrofono.textContent = "🎙️";
   };
 } else {
   botonMicrofono.addEventListener("click", () => {
-    estado.textContent =
-      "Tu navegador no admite el reconocimiento de voz.";
+    estado.textContent = "Tu navegador no admite el reconocimiento de voz.";
   });
 }
 
+document.getElementById("zona").addEventListener("submit", e => {
   e.preventDefault();
 
   const texto = entrada.value.trim();
