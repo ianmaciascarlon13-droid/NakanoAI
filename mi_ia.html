@@ -862,24 +862,65 @@ function hablarRespuesta(texto) {
   window.speechSynthesis.speak(voz);
 }
 document.getElementById("borrarHistorial").addEventListener("click", () => {
-  const confirmar = confirm(
-    "¿Quieres borrar todas las conversaciones guardadas?"
-  );
+  const fondo = document.createElement("div");
 
-  if (!confirmar) return;
+  fondo.style.cssText = `
+    position: fixed;
+    inset: 0;
+    background: #000a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 20px;
+  `;
 
-  cancelarSolicitudActual();
+  const ventana = document.createElement("div");
 
-  conversaciones = [];
-  historial = [];
+  ventana.style.cssText = `
+    background: var(--panel);
+    border: 1px solid var(--verde);
+    border-radius: 14px;
+    padding: 22px;
+    width: 100%;
+    max-width: 320px;
+    text-align: center;
+    color: var(--texto);
+    box-shadow: 0 0 20px #39ff8840;
+  `;
 
-  localStorage.removeItem(CLAVE_CONVERSACIONES);
-  localStorage.removeItem(CLAVE_HISTORIAL);
+  ventana.innerHTML = `
+    <h3 style="color: var(--verde);">¿Borrar historial?</h3>
+    <p>¿Quieres borrar todas las conversaciones guardadas?</p>
+    <div style="display:flex; gap:12px; justify-content:center;">
+      <button id="cancelarBorrado" type="button">No</button>
+      <button id="confirmarBorrado" type="button">Sí, borrar</button>
+    </div>
+  `;
 
-  crearConversacion();
+  fondo.appendChild(ventana);
+  document.body.appendChild(fondo);
 
-  menuOpciones.hidden = true;
-  botonMenu.setAttribute("aria-expanded", "false");
+  document.getElementById("cancelarBorrado").onclick = () => {
+    fondo.remove();
+  };
+
+  document.getElementById("confirmarBorrado").onclick = () => {
+    fondo.remove();
+
+    cancelarSolicitudActual();
+
+    conversaciones = [];
+    historial = [];
+
+    localStorage.removeItem(CLAVE_CONVERSACIONES);
+    localStorage.removeItem(CLAVE_HISTORIAL);
+
+    crearConversacion();
+
+    menuOpciones.hidden = true;
+    botonMenu.setAttribute("aria-expanded", "false");
+  };
 });
 </script>
 </body>
