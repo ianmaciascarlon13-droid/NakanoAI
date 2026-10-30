@@ -316,7 +316,16 @@ button:active {
 
 <form id="zona">
   <input id="entrada" placeholder="Escribe un mensaje..." autocomplete="off">
+
   <button type="button" id="microfono">🎙️</button>
+  <button type="button" id="botonImagen">🖼️</button>
+  <button type="button" id="botonCamara">📷</button>
+  <button type="button" id="botonArchivo">📎</button>
+
+  <input type="file" id="seleccionarImagen" accept="image/*" hidden>
+  <input type="file" id="seleccionarCamara" accept="image/*" capture="environment" hidden>
+  <input type="file" id="seleccionarArchivo" accept=".pdf,.txt,.md,.csv" hidden>
+
   <button type="submit">Enviar</button>
 </form>
 
@@ -324,6 +333,34 @@ button:active {
 <script>
 const chat = document.getElementById("chat");
 const entrada = document.getElementById("entrada");
+const botonImagen = document.getElementById("botonImagen");
+const botonCamara = document.getElementById("botonCamara");
+const botonArchivo = document.getElementById("botonArchivo");
+
+const seleccionarImagen = document.getElementById("seleccionarImagen");
+const seleccionarCamara = document.getElementById("seleccionarCamara");
+const seleccionarArchivo = document.getElementById("seleccionarArchivo");
+
+let archivosPendientes = [];
+
+botonImagen.onclick = () => seleccionarImagen.click();
+botonCamara.onclick = () => seleccionarCamara.click();
+botonArchivo.onclick = () => seleccionarArchivo.click();
+
+seleccionarImagen.onchange = e => {
+  archivosPendientes.push(...e.target.files);
+  e.target.value = "";
+};
+
+seleccionarCamara.onchange = e => {
+  archivosPendientes.push(...e.target.files);
+  e.target.value = "";
+};
+
+seleccionarArchivo.onchange = e => {
+  archivosPendientes.push(...e.target.files);
+  e.target.value = "";
+};
 const estado = document.getElementById("estado");
 const CLAVE_HISTORIAL = "mi_ia_historial_v1";
 const CLAVE_MEMORIA = "mi_ia_memoria_v1";
@@ -495,7 +532,7 @@ function cargar() {
   abrirConversacion(conversaciones[0].id);
 }
 async function enviarMensaje(texto) {
-  if (enviando || !texto.trim()) return;
+  if (enviando || (!texto.trim() && archivosPendientes.length === 0)) return;
   const idSolicitud = ++solicitudId;
 const idConversacion = conversacionActivaId;
 
@@ -516,7 +553,11 @@ const idConversacion = conversacionActivaId;
   entrada.disabled = true;
   estado.textContent = "Gemini está pensando...";
 
-  historial.push({ role: "user", text: texto });
+  historial.push({
+  role: "user",
+  text: texto,
+  archivos: archivosPendientes
+});
 
 const activa = conversaciones.find(
   c => c.id === conversacionActivaId
@@ -553,21 +594,89 @@ const fechaActual = new Date().toLocaleString("es-MX", {
   dateStyle: "full",
   timeStyle: "short"
 });
+const partesArchivos = await Promise.all(
+  archivosPendientes.map(async archivo => {
+    const base64 = await new Promise((resolve, reject) => {
+      const lector = new FileReader();
+      lector.onload = () => resolve(lector.result.split(",")[1]);
+      lector.onerror = reject;
+      lector.readAsDataURL(archivo);
+    });
+
+    if (archivo.type.startsWith("image/")) {
+      return {
+        inline_data: {
+          mime_type: archivo.type,
+          data: base64
+        }
+      };
+    }
+
+    if (archivo.type === "application/pdf") {
+      return {
+        inline_data: {
+          mime_type: archivo.type,
+          data: base64
+        }
+      };
+    }
+
+    return {
+      text: "Contenido del archivo " + archivo.name + ":\n" +
+        atob(base64)
+    };
+  })
+);
+
+const partesArchivos = await Promise.all(
+  archivosPendientes.map(async archivo => {
+    if (
+      archivo.type.startsWith("image/") ||
+      archivo.type === "application/pdf"
+    ) {
+      const base64 = await new Promise((resolve, reject) => {
+        const lector = new FileReader();
+        lector.onload = () => resolve(lector.result.split(",")[1]);
+        lector.onerror = reject;
+        lector.readAsDataURL(archivo);
+      });
+
+      return {
+        inline_data: {
+          mime_type: archivo.type,
+          data: base64
+        }
+      };
+    }
+
+    return {
+      text: "Archivo " + archivo.name + ":\n" +
+        await archivo.text()
+    };
+  })
+);
+
 const contenidos = [
   {
     role: "user",
     parts: [{
       text: "Contexto: " + instruccionesMemoria +
-  "\nFecha y hora actual del dispositivo: " + fechaActual +
-  ". Si preguntan la hora o la fecha, responde usando estos datos."
+        "\nFecha y hora actual del dispositivo: " + fechaActual +
+        ". Si preguntan la hora o la fecha, responde usando estos datos."
     }]
   },
-  ...historial.slice(-30).map(m => ({
+  ...historial.slice(-30).map((m, indice, lista) => ({
     role: m.role,
-    parts: [{ text: m.text }]
+    parts: [
+      { text: m.text },
+      ...(indice === lista.length - 1 && m.role === "user"
+        ? partesArchivos
+        : [])
+    ]
   }))
 ];
 
+archivosPendientes = [];
 let respuesta;
 let datos;
 let ultimoError;
@@ -760,16 +869,17 @@ if (ReconocimientoVoz) {
   });
 }
 
-document.getElementById("zona").addEventListener("submit", e => {
+document.getElementById("zona").
+addEventListener("submit", e => {
   e.preventDefault();
 
   const texto = entrada.value.trim();
-  if (!texto || enviando) return;
+
+  if (enviando || (!texto && archivosPendientes.length === 0)) return;
 
   entrada.value = "";
-  enviarMensaje(texto);
+  enviarMensaje(texto || "Analiza el archivo adjunto.");
 });
-
 document.getElementById("nuevo").addEventListener("click", () => {
   cancelarSolicitudActual();
   crearConversacion();
